@@ -71,7 +71,7 @@ class Todo(Resource):
             'allowMultiple': False,
             'dataType': 'string',
             'paramType': 'path',
-        },{
+        }, {
             'name': 'a_bool',
             'description': 'The ID of the TODO item',
             'required': True,
@@ -84,7 +84,9 @@ class Todo(Resource):
         """Summary"""
 
         # We expect this method to be in our specs.
-        return '{}{}'.format(TODO_ITEM, todo_id), 200, {
+        return {
+           'todo_item': '{}{}'.format(TODO_ITEM, todo_id)
+        }, 200, {
             'Access-Control-Allow-Origin': '*',
         }
 
