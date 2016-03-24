@@ -10,19 +10,22 @@ import importlib
 from flask import Blueprint
 from flask_restful import Api
 
-from flask_restful_swagger.producers import JsonProducer, HtmlProducer
-from flask_restful_swagger import swagger_definitions
-from flask_restful_swagger.utils import (
-    convert_from_camel_case,
+from flask_restful_swagger.producers import (
+    JsonResourceListingProducer,
+    JsonResourceProducer,
+    HtmlProducer,
+    BaseProducer,
 )
+from flask_restful_swagger import swagger_definitions
+
 
 __author__ = 'sobolevn'
 
 
 class SwaggerDocs(object):
-    _default_description = 'Auto generated API docs by flask-restful-swagger'
     _known_producers = [
-        JsonProducer,
+        JsonResourceListingProducer,
+        JsonResourceProducer,
         HtmlProducer,
     ]
 
@@ -45,44 +48,48 @@ class SwaggerDocs(object):
         except ImportError:
             raise ValueError('No such swagger version: ' + version)
 
-    def __init__(self,
-                 api,
-                 api_version='0.0',
-                 swagger_version='1.2',
-                 base_path='http://localhost:5000',
-                 resource_path='/',
-                 produces=None,
-                 api_spec_url='/api/spec',
-                 description=None,
-                 # New kwargs since 1.0.0:
-                 static_folder=None,
-                 static_url_path='',
-                 template_folder=None,
-                 ):
+    def _set_default_meta_values(self, values):
+        defaults_values = {
+            'apiVersion': '0.0.1',
+            'swaggerVersion': '1.2',
+        }
+
+        for k, v in six.iteritems(defaults_values):
+            if k not in values or not values[k]:
+                values[k] = v
+
+    def __init__(self, api, swagger_meta=None, swagger_listing_meta=None,
+                 api_spec_url='/api/spec', template_folder=None,
+                 static_folder=None, static_url_path=None):
         if not isinstance(api, Api):
-            raise ValueError("Provided `api` object is not flask-restful's Api")
+            raise ValueError(
+                "Provided `api` object is not flask-restful's Api")
 
         self.api = api
-        self.api_version = api_version
-        self.swagger_version = swagger_version
-        self.base_path = base_path
-        self.resource_path = resource_path
-        self.api_spec_url = api_spec_url
-        self.description = description or self._default_description
+        self.swagger_meta = swagger_meta
+        self.swagger_listing_meta = swagger_listing_meta
+        self._set_default_meta_values(self.swagger_listing_meta)
+        self._set_default_meta_values(self.swagger_meta)
 
         self.definitions = None
-        self._import_required_version(swagger_version)
+        # This will set `self.definitions` to the appropriate module:
+        self._import_required_version(
+            swagger_listing_meta['swaggerVersion'])
+        self.swagger_meta = self.definitions.SwaggerMeta()
+        self.swagger_listing_meta = self.definitions.SwaggerListingMeta(
+            self.swagger_listing_meta
+        )
 
-        self._detect_producers(produces)
+        self._detect_producers(self.swagger_meta)
+
         self.operations = []
+        self.models = []
+        self.resources = {}
 
-        self.static_url_path = static_url_path
+        self.api_spec_url = api_spec_url
+        self.static_url_path = static_url_path or ''
         self.static_folder = static_folder
-
         dir_name = os.path.dirname(__file__)
-        if self.static_folder is None:
-            self.static_folder = os.path.join(
-                dir_name, 'static', 'swagger-ui')
 
         self.template_folder = template_folder
         if self.template_folder is None:
@@ -90,6 +97,10 @@ class SwaggerDocs(object):
             # folder, just because swagger-ui is made that way. But
             # Both of these folders are required for agile customisation.
             self.template_folder = os.path.join(
+                dir_name, 'static', 'swagger-ui')
+
+        if self.static_folder is None:
+            self.static_folder = os.path.join(
                 dir_name, 'static', 'swagger-ui')
 
         self.app = api.app
@@ -110,30 +121,35 @@ class SwaggerDocs(object):
             self.__class__.__name__,
             self.__class__.__name__,
             url_prefix=self.api_spec_url,
-            template_folder=self.template_folder,
             static_folder=self.static_folder,
+            template_folder=self.template_folder,
             static_url_path=self.static_url_path,
         )
 
+        # TODO: move url creation inside the producers!
         for producer_class in self.produces:
-            content_type = producer_class.content_type
-            ext = mimetypes.guess_extension(content_type).replace('.', '')
-
-            self.blueprint.add_url_rule(
-                '/' + ext,
-                view_func=self._get(ext, producer_class),
-            )
+            producer_class(self).create_endpoint()
 
         self.app.register_blueprint(self.blueprint)
 
-    def add_resource(self, resource, *urls, **kwargs):
-        return self.api.add_resource(resource, *urls, **kwargs)
+    def add_resource(self, resource, url, **kwargs):
+        # TODO: multiple url support?
+        swagger_resource = self.definitions.SwaggerResource(resource, url=url)
+
+        self.api.add_resource(resource, url, **kwargs)
+        self.resources.update({resource.endpoint: swagger_resource})
+
+    def resource(self, **kwargs):
+        def _inner(resource_class):
+            resource_class.swagger_attr = kwargs
+            return resource_class
+        return _inner
 
     def operation(self, *args, **kwargs):
         def _inner(func):
             operation = self.definitions.SwaggerOperation(
-                func, *args, **kwargs)
-            self.operations.append(operation)
+                *args, **kwargs)
+            func.operation = operation
             return func
 
         return _inner
@@ -141,47 +157,19 @@ class SwaggerDocs(object):
     def model(self, func):
         return func
 
-    def _get(self, content_type, producer_class):
-        def _inner():
-            return producer_class(self).get()
-
-        _inner.__name__ = content_type
-        return _inner
-
-    def _extract_specs(self):
-        return {
-            'apiVersion': self.api_version,
-            'description': self.description,
-        }
-
     def _detect_producers(self, produces):
         if not produces:
-            self.produces = [JsonProducer]
+            self.produces = self.__class__._known_producers
         else:
             self.produces = []
-            for producer in self.__class__._known_producers:
-                for content_type in produces:
-                    if producer.content_type == content_type and \
-                                    producer not in self.produces:
+            for wanted_producer in produces:
+                if wanted_producer in self.produces:
+                    continue
+
+                if issubclass(wanted_producer, BaseProducer):
+                    self.produces.append(wanted_producer)
+                    continue
+
+                for producer in self.__class__._known_producers:
+                    if producer.content_type == wanted_producer:
                         self.produces.append(producer)
-
-
-
-def docs(api, **kwargs):
-    """
-    This function adds endpoints for the swagger.
-    It also handles all the model loading by replacing original `add_resource`
-    with the patched one.
-
-        :version changed 1.0.0
-        The old docs() function before version 1.0.0 had 'camelCase' kwargs,
-        which was not-PEP8, and now it is recommended to use 'snake_case'.
-        But for backward compatibility 'cameCase' is also accepted.
-
-    :param api: flask-resful's Api object
-    :param kwargs: key-word arguments described in `_docs` function.
-    :return: flask-resful's Api object passed as `api`.
-    """
-    new_kwargs = {convert_from_camel_case(k): v
-                  for k, v in six.iteritems(kwargs)}
-    return SwaggerDocs(api, **new_kwargs)
