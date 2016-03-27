@@ -11,6 +11,9 @@ class BaseProducer(object):
     content_type = None
     swagger = None
 
+    def __init__(self, swagger):
+        self.swagger = swagger
+
     def _create_view_function(self, ext):
         def _inner(*args, **kwargs):
             return self.get(*args, **kwargs)
@@ -34,10 +37,6 @@ class BaseProducer(object):
 class HtmlProducer(BaseProducer):
     content_type = 'text/html'
 
-    def __init__(self, swagger):
-        super(HtmlProducer, self).__init__()
-        self.swagger = swagger
-
     def get(self, *args, **kwargs):
         if request.method == 'GET':
             json_url = request.args.get('url', None)
@@ -52,10 +51,6 @@ class HtmlProducer(BaseProducer):
 class JsonResourceListingProducer(BaseProducer):
     content_type = 'application/json'
 
-    def __init__(self, swagger):
-        super(JsonResourceListingProducer, self).__init__()
-        self.swagger = swagger
-
     def get(self, *args, **kwargs):
         meta = self.swagger.swagger_listing_meta.render(
             resources=self.swagger.resources)
@@ -64,10 +59,6 @@ class JsonResourceListingProducer(BaseProducer):
 
 class JsonResourceProducer(BaseProducer):
     content_type = 'application/json'
-
-    def __init__(self, swagger):
-        super(JsonResourceProducer, self).__init__()
-        self.swagger = swagger
 
     def create_endpoint(self):
         self.swagger.blueprint.add_url_rule(
@@ -79,6 +70,8 @@ class JsonResourceProducer(BaseProducer):
         resource = kwargs.pop('resource')
         resource = self.swagger.resources[resource]
         meta = self.swagger.swagger_meta.render(
-            resource=resource)
+            resource=resource,
+            models=self.swagger.models,
+        )
 
         return jsonify(meta)

@@ -19,10 +19,10 @@ def deprecated(func):
     @functools.wraps(func)
     def new_func(*args, **kwargs):
         warnings.warn_explicit(
-            "Call to deprecated function {}.".format(func.__name__),
-            category=DeprecationWarning,
-            filename=func.func_code.co_filename,
-            lineno=func.func_code.co_firstlineno + 1,
+                "Call to deprecated function {}.".format(func.__name__),
+                category=DeprecationWarning,
+                filename=func.func_code.co_filename,
+                lineno=func.func_code.co_firstlineno + 1,
         )
         return func(*args, **kwargs)
 
@@ -46,20 +46,11 @@ def _parse_doc(obj):
         line_feed = full_doc.find('\n')
         if line_feed != -1:
             first_line = _sanitize_doc(full_doc[:line_feed])
-            other_lines = _sanitize_doc(full_doc[line_feed+1:])
+            other_lines = _sanitize_doc(full_doc[line_feed + 1:])
         else:
             first_line = full_doc
 
     return first_line, other_lines
-
-
-def extract_operations(resource):
-    operations = []
-    for k, v in resource.orig.__dict__.items():
-        if callable(v) and hasattr(v, 'operation'):
-            operations.append({k: getattr(v, 'operation')})
-
-    return operations
 
 
 def extract_swagger_path(path):
@@ -68,6 +59,8 @@ def extract_swagger_path(path):
     This /path/<parameter> turns into this /path/{parameter}
     And this /<string(length=2):lang_code>/<string:id>/<float:probability>
     to this: /{lang_code}/{id}/{probability}
+    :param path: flask's formatted path
+    :return: path in swagger's format
     """
     return re.sub('<(?:[^:]+:)?([^>]+)>', '{\\1}', path)
 

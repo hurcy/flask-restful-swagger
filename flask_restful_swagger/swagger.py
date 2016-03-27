@@ -83,7 +83,7 @@ class SwaggerDocs(object):
         self._detect_producers(self.swagger_meta)
 
         self.operations = []
-        self.models = []
+        self.models = {}
         self.resources = {}
 
         self.api_spec_url = api_spec_url
@@ -151,11 +151,15 @@ class SwaggerDocs(object):
                 *args, **kwargs)
             func.operation = operation
             return func
-
         return _inner
 
-    def model(self, func):
-        return func
+    def model(self, obj):
+        def _inner(*args, **kwargs):
+            return obj(*args, **kwargs)
+        self.models.update({
+            obj.__name__: self.definitions.SwaggerModel(obj)
+        })
+        return _inner
 
     def _detect_producers(self, produces):
         if not produces:

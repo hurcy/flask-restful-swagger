@@ -17,5 +17,5 @@ class SwaggerListingMeta(dict, SwaggerDefinition):
 
 
 class SwaggerMeta(dict, SwaggerDefinition):
-    def render(self, resource):
-        return resource.render()
+    def render(self, resource, models=None):
+        return resource.render(models=models)

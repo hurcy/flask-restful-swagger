@@ -4,7 +4,6 @@ from flask_restful_swagger.swagger_definitions.base_swagger_definition import (
     SwaggerDefinition,
 )
 from flask_restful_swagger.utils import (
-    extract_operations,
     extract_swagger_path,
 )
 
@@ -24,6 +23,17 @@ class SwaggerResource(SwaggerDefinition):
             'description': '',
         }
 
+    def _extract_operations(self):
+        operations = []
+        for k, v in self.orig.__dict__.items():
+            if callable(v) and hasattr(v, 'operation'):
+                operation = getattr(v, 'operation')
+                args = operation.extract_path_arguments(self.url)
+                operation.add_path_arguments(args)
+                operations.append({k: operation})
+
+        return operations
+
     def _render_operations(self, operations):
         result = []
         for operation in operations:
@@ -34,8 +44,8 @@ class SwaggerResource(SwaggerDefinition):
 
         return result
 
-    def render(self):
-        operations = extract_operations(self)
+    def render(self, models=None):
+        operations = self._extract_operations()
         result = self.orig.swagger_attr
 
         result['apis'] = []
@@ -43,5 +53,8 @@ class SwaggerResource(SwaggerDefinition):
             'path': self.swagger_url,
             'operations': self._render_operations(operations),
         })
+
+        if models:
+            result['models'] = {k: v.render() for k, v in models.items()}
 
         return result
