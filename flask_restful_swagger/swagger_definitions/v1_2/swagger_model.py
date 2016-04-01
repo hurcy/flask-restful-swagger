@@ -129,14 +129,21 @@ class SwaggerModel(SwaggerDefinition):
         try:
             # Updating properties based on custom metadata:
             model_meta = self.model_class.swagger_metadata
+            meta_properties = model_meta.pop('properties', {})
+            model_meta.pop('id', None)  # id is not suited for changes
+
             for field_name, field_metadata in model_meta.items():
-                if field_name in properties:
-                    properties[field_name].update(field_metadata)
+                result[field_name] = field_metadata
+
+            # updating properties metas: description, format, enums:
+            for name, values in meta_properties.items():
+                values.pop('type', None)  # type is not suited for change
+                properties[name].update(values)
         except AttributeError:
             pass
 
         result['properties'] = properties
-        result['description'] = ''
+
         return result
 
     def render(self):

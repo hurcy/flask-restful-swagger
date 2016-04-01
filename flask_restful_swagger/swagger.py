@@ -156,9 +156,11 @@ class SwaggerDocs(object):
     def model(self, obj):
         def _inner(*args, **kwargs):
             return obj(*args, **kwargs)
+
         self.models.update({
             obj.__name__: self.definitions.SwaggerModel(obj)
         })
+        _inner.__name__ = obj.__name__
         return _inner
 
     def _detect_producers(self, produces):

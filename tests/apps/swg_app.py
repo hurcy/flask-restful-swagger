@@ -47,6 +47,22 @@ class TodoItem(object):
 class ModelWithResourceFields(object):
     resource_fields = {
         'a_string': fields.String(),
+        'opt_integer': fields.Integer(),
+    }
+
+    swagger_metadata = {
+        'description': 'This will be shown as a desc.',
+        'properties': {
+            'a_string': {
+                'description': 'A string field.',
+            },
+            'opt_integer': {
+                'format': 'int64'
+            }
+        },
+        'required': [
+            'a_string',
+        ]
     }
 
 
@@ -70,6 +86,7 @@ class Todo(Resource):
 
     @swagger.operation(
             notes='get a todo item by ID',
+            type=ModelWithResourceFields.__name__,
             nickname='get',
             parameters=[{
                 "name": "todo_tag",
