@@ -465,12 +465,16 @@ def extract_swagger_path(path):
 def extract_path_arguments(path):
     """
     Extracts a swagger path arguments from the given flask path.
-    This /path/<parameter> extracts [{name: 'parameter'}]
-    And this /<string(length=2):lang_code>/<string:id>/<float:probability>
-    extracts: [
-    {name: 'lang_code', dataType: 'string'},
-    {name: 'id', dataType: 'string'}
-    {name: 'probability', dataType: 'float'}]
+
+    Examples:
+        This /path/<parameter> extracts [{name: 'parameter'}]
+
+        And this /<string(length=2):lang_code>/<string:id>/<float:probability>
+        extracts: [
+        {name: 'lang_code', dataType: 'string'},
+        {name: 'id', dataType: 'string'}
+        {name: 'probability', dataType: 'float'}]
+
     """
     # Remove all parentheses
     path = re.sub('\([^\)]*\)', '', path)
