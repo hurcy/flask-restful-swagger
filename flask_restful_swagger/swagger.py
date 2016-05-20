@@ -1,7 +1,11 @@
+# -*- coding: utf-8 -*-
+
+from __future__ import absolute_import
+
 import functools
 import inspect
-import os
 import re
+import six
 
 try:
     # urlparse is renamed to urllib.parse in python 3
@@ -9,72 +13,120 @@ try:
 except ImportError:
     from urllib import parse as urlparse
 
-from flask import request, abort, Response
-from flask.ext.restful import Resource, fields
-from flask_restful_swagger import (
-    registry, api_spec_static)
-from jinja2 import Template
+from flask.ext.restful import fields
+from flask_restful_swagger import StorageSingleton
 
-resource_listing_endpoint = None
+from flask_restful_swagger.registry import get_current_registry
+from flask_restful_swagger.resources import (
+    SwaggerRegistry,
+    ResourceLister,
+    StaticFiles,
+    SwaggerResource,
+    SwaggerResourceMeta,
+)
+
+from flask_restful_swagger.utils import (
+    return_class,
+    convert_from_camel_case,
+    predicate,
+)
 
 
-def docs(api,
-         apiVersion='0.0',
-         swaggerVersion='1.2',
-         basePath='http://localhost:5000',
-         resourcePath='/',
-         produces="application/json",
-         api_spec_url='/api/spec',
-         description='Auto generated API docs by flask-restful-swagger'):
+# TODO: add pydoc.
+def _docs(api,
+          api_version='0.0',
+          swagger_version='1.2',
+          base_path='http://localhost:5000',
+          resource_path='/',
+          produces="application/json",
+          api_spec_url='/api/spec',
+          description='Auto generated API docs by flask-restful-swagger'):
+    """
+
+    :param api:
+    :param api_version:
+    :param swagger_version:
+    :param base_path:
+    :param resource_path:
+    :param produces:
+    :param api_spec_url:
+    :param description:
+    :return:
+    """
     api_add_resource = api.add_resource
 
-    def add_resource(resource, path, *args, **kvargs):
-        register_once(api, api_add_resource, apiVersion, swaggerVersion, basePath,
-                      resourcePath, produces, api_spec_url, description)
+    def add_resource(resource, *urls, **kwargs):
+        register_once(
+            api, api_add_resource, api_version,
+            swagger_version, base_path, resource_path,
+            produces, api_spec_url, description,
+        )
 
-        resource = make_class(resource)
-        endpoint = swagger_endpoint(api, resource, path)
+        resource = return_class(resource)
+        # Changed in #pull/92
+        for path in urls:
+            endpoint = swagger_endpoint(api, resource, path)
 
-        # Add a .help.json help url
-        swagger_path = extract_swagger_path(path)
-
-        # Add a .help.html help url
-        endpoint_html_str = '{0}/help'.format(swagger_path)
-        api_add_resource(
+            # Add '.help.json' and '.help.html' help urls:
+            swagger_path = extract_swagger_path(path)
+            endpoint_html_str = '{0}/help'.format(swagger_path)
+            # TODO: help.html probably should have a separate endpoint
+            # with a unique name, to be accessible within the code.
+            api_add_resource(
                 endpoint,
                 "{0}.help.json".format(swagger_path),
                 "{0}.help.html".format(swagger_path),
-                endpoint=endpoint_html_str)
+                endpoint=endpoint_html_str,
+            )
 
-        return api_add_resource(resource, path, *args, **kvargs)
+        return api_add_resource(resource, *urls, **kwargs)
 
     api.add_resource = add_resource
-
     return api
 
 
-rootPath = os.path.dirname(__file__)
+def docs(api, **kwargs):
+    """
+    This function adds endpoints for the swagger.
+    It also handles all the model loading by replacing original `add_resource`
+    with the patched one.
+
+        :version changed 1.0.0
+        The old docs() function before version 1.0.0 had 'camelCase' kwargs,
+        which was not-PEP8, and now it is recommended to use 'snake_case'.
+        But for backward compatibility 'cameCase' is also accepted.
+
+    :param api: flask-resful's Api object
+    :param kwargs: key-word arguments described in `_docs` function.
+    :return: flask-resful's Api object passed as `api`.
+    """
+    new_kwargs = {convert_from_camel_case(k): v
+                  for k, v in six.iteritems(kwargs)}
+    return _docs(api, **new_kwargs)
 
 
-def make_class(class_or_instance):
-    if inspect.isclass(class_or_instance):
-        return class_or_instance
-    return class_or_instance.__class__
-
-
-def register_once(api, add_resource_func, apiVersion, swaggerVersion, basePath,
-                  resourcePath, produces, endpoint_path, description):
+def register_once(api,
+                  add_resource_func,
+                  api_version,
+                  swagger_version,
+                  base_path,
+                  resource_path,
+                  produces,
+                  endpoint_path,
+                  description):
+    def registering_blueprint(setup_state):
+        reg = registry[setup_state.blueprint.name]
+        reg['x-api-prefix'] = setup_state.url_prefix
 
     def register_action(name, is_blueprint=True):
-        global api_spec_static
-        global resource_listing_endpoint
+        resource_listing_endpoint = StorageSingleton().resource_listing_endpoint
 
         registry[name] = {
-            'apiVersion': apiVersion,
-            'swaggerVersion': swaggerVersion,
-            'basePath': basePath,
+            'apiVersion': api_version,
+            'swaggerVersion': swagger_version,
+            'basePath': base_path,
             'spec_endpoint_path': endpoint_path,
-            'resourcePath': resourcePath,
+            'resourcePath': resource_path,
             'produces': produces,
             'description': description,
         }
@@ -84,10 +136,6 @@ def register_once(api, add_resource_func, apiVersion, swaggerVersion, basePath,
                 'apis': [],
             })
 
-            def registering_blueprint(setup_state):
-                reg = registry[setup_state.blueprint.name]
-                reg['x-api-prefix'] = setup_state.url_prefix
-
             api.blueprint.record(registering_blueprint)
 
         add_resource_func(
@@ -95,7 +143,7 @@ def register_once(api, add_resource_func, apiVersion, swaggerVersion, basePath,
             endpoint_path,
             endpoint_path + '.json',
             endpoint_path + '.html',
-            endpoint= 'app/registry' if not is_blueprint else None,
+            endpoint='app/registry' if not is_blueprint else None,
         )
 
         resource_listing_endpoint = endpoint_path + '/_/resource_list.json'
@@ -104,158 +152,36 @@ def register_once(api, add_resource_func, apiVersion, swaggerVersion, basePath,
             endpoint='app/resourcelister' if not is_blueprint else None,
         )
 
-        api_spec_static = endpoint_path + '/_/static/'
-        add_resource_func( # TODO: why static path is like this?
+        st = StorageSingleton()
+        st.api_spec_static = endpoint_path + '/_/static/'
+        add_resource_func(  # TODO: why static path is like this?
             StaticFiles,
-            api_spec_static + '<string:dir1>/<string:dir2>/<string:dir3>',
-            api_spec_static + '<string:dir1>/<string:dir2>',
-            api_spec_static + '<string:dir1>',
+            st.api_spec_static + '<string:dir1>/<string:dir2>/<string:dir3>',
+            st.api_spec_static + '<string:dir1>/<string:dir2>',
+            st.api_spec_static + '<string:dir1>',
             endpoint='app/staticfiles' if not is_blueprint else None,
         )
+
+    registry = StorageSingleton().registry
 
     if api.blueprint and not registry.get(api.blueprint.name):
         # Most of all this can be taken from the blueprint/app
         register_action(api.blueprint.name, True)
-    elif not 'app' in registry:  # review: reuse previous code?
+    elif 'app' not in registry:  # review: reuse previous code?
         register_action('app', False)
-
-
-templates = {}
-
-
-def render_endpoint(endpoint):
-    return render_page("endpoint.html", endpoint.__dict__)
-
-
-def render_homepage(resource_list_url):
-    conf = {'resource_list_url': resource_list_url}
-    return render_page("index.html", conf)
-
-
-def _get_current_registry(api=None):
-    global registry
-
-    overrides = {}
-    if api:
-        app_name = api.blueprint.name if api.blueprint else None
-    else:
-        app_name = request.blueprint
-        urlparts = urlparse.urlparse(request.url_root.rstrip('/'))
-        proto = request.headers.get("x-forwarded-proto") or urlparts[0]
-        overrides = {'basePath': urlparse.urlunparse([proto] + list(urlparts[1:]))}
-
-    if not app_name:
-        app_name = 'app'
-
-    overrides['models'] = registry.get('models', {})
-
-    reg = registry.setdefault(app_name, {})
-    reg.update(overrides)
-
-    reg['basePath'] = reg['basePath'] + (reg.get('x-api-prefix', '') or '')
-
-    return reg
-
-
-def render_page(page, info):
-    global templates
-
-    req_registry = _get_current_registry()
-    url = req_registry['basePath']
-    if url.endswith('/'):
-        url = url.rstrip('/')
-    conf = {
-        'base_url': url + api_spec_static,
-        'full_base_url': url + api_spec_static
-    }
-    if info is not None:
-        conf.update(info)
-
-    if page in templates:
-        template = templates[page]
-    else:
-        with open(os.path.join(rootPath, 'static', page), "r") as fs:
-            template = Template(fs.read())
-            templates[page] = template
-    mime = 'text/html'
-    if page.endswith('.js'):  # TODO: change
-        mime = 'text/javascript'
-    return Response(template.render(conf), mimetype=mime)
-
-
-class StaticFiles(Resource):
-    def get(self, dir1=None, dir2=None, dir3=None):
-        # TODO: is it possible to change this signature?
-        req_registry = _get_current_registry()
-
-        if dir1 is None:
-            filePath = "index.html"
-        else:  # TODO: this can be improved
-            # Try something like:
-            # '/'.join(v.strip('/') for k, v in kwargs.items() if v is not None)
-            filePath = dir1
-            if dir2 is not None:
-                filePath = "%s/%s" % (filePath, dir2)
-                if dir3 is not None:
-                    filePath = "%s/%s" % (filePath, dir3)
-
-        if filePath in [
-            "index.html",
-            "o2c.html",
-            "swagger-ui.js",
-            "swagger-ui.min.js",
-            "lib/swagger-oauth.js",
-        ]:
-            conf = {'resource_list_url': req_registry['spec_endpoint_path']}
-            return render_page(filePath, conf)
-
-        # TODO: replace with mimetype.types_map
-        mime = 'text/plain'
-        if filePath.endswith(".gif"):
-            mime = 'image/gif'
-        elif filePath.endswith(".png"):
-            mime = 'image/png'
-        elif filePath.endswith(".js"):
-            mime = 'text/javascript'
-        elif filePath.endswith(".css"):
-            mime = 'text/css'
-
-        file_path = os.path.join(rootPath, 'static', filePath)
-        if os.path.exists(file_path):
-            fs = open(file_path, "rb")  # TODO: add with statement
-            return Response(fs, mimetype=mime)
-        abort(404)
-
-
-class ResourceLister(Resource):
-    def get(self):
-        req_registry = _get_current_registry()
-        return {
-            "apiVersion": req_registry['apiVersion'],
-            "swaggerVersion": req_registry['swaggerVersion'],
-            "apis": [{
-                "path": (
-                    req_registry['basePath'] +
-                    req_registry['spec_endpoint_path']
-                ),
-                "description": req_registry['description']
-            }]
-        }
 
 
 def swagger_endpoint(api, resource, path):
     endpoint = SwaggerEndpoint(resource, path)
-    req_registry = _get_current_registry(api=api)
+    req_registry = get_current_registry(api=api)
     req_registry.setdefault('apis', []).append(endpoint.__dict__)
 
-    class SwaggerResource(Resource):
-        def get(self):
-            if request.path.endswith('.help.json'):
-                return endpoint.__dict__
-            if request.path.endswith('.help.html'):
-                return render_endpoint(endpoint)
-
-    return SwaggerResource
+    return SwaggerResourceMeta(
+        SwaggerResource.__name__,
+        SwaggerResource.__bases__,
+        dict(SwaggerResource.__dict__),
+        _swagger_endpoint=endpoint,
+    )
 
 
 def _sanitize_doc(comment):
@@ -284,8 +210,11 @@ class SwaggerEndpoint(object):
         self.description, self.notes = _parse_doc(resource)
         self.operations = self.extract_operations(resource, path_arguments)
 
-    @staticmethod  # TODO: mutable in argument:
-    def extract_operations(resource, path_arguments=[]):
+    @staticmethod
+    def extract_operations(resource, path_arguments=None):
+        if path_arguments is None:
+            path_arguments = []
+
         operations = []  # review: 4 `for` loops nested? This can be improved.
         for method in resource.methods:
             method_impl = resource.__dict__.get(method.lower(), None)
@@ -293,7 +222,7 @@ class SwaggerEndpoint(object):
                 for cls in resource.__mro__:
                     try:
                         method_impl = cls.__dict__[method.lower()]
-                    except IndexError:
+                    except KeyError:
                         pass
 
             summary, notes = _parse_doc(method_impl)
@@ -308,8 +237,15 @@ class SwaggerEndpoint(object):
             if '__swagger_attr' in method_impl.__dict__:
                 # This method was annotated with @swagger.operation
                 decorators = method_impl.__dict__['__swagger_attr']
-                for att_name, att_value in list(decorators.items()):
-                    if isinstance(att_value, (str, int, list)):
+
+                # bug-fix for:
+                # https://github.com/rantav/flask-restful-swagger/issues/90
+                primitives = (
+                    six.string_types, six.integer_types, list, tuple,
+                )
+
+                for att_name, att_value in six.iteritems(decorators):
+                    if isinstance(att_value, primitives):
                         if att_name == 'parameters':
                             op['parameters'] = merge_parameter_list(
                                 op['parameters'], att_value
@@ -320,8 +256,9 @@ class SwaggerEndpoint(object):
                                     att_value, op[att_name]
                                 )
                             op[att_name] = att_value
-                    elif isinstance(att_value, object):
+                    elif hasattr(att_value, '__name__'):
                         op[att_name] = att_value.__name__
+                    # TODO: else: raise CustomException
                 operations.append(op)
         return operations
 
@@ -337,18 +274,6 @@ def merge_parameter_list(base, override):
         else:
             base.append(o)
     return base
-
-
-class SwaggerRegistry(Resource):
-    def get(self):
-        req_registry = _get_current_registry()
-        if request.path.endswith('.html'):
-            return render_homepage(
-                req_registry['basePath'] +
-                req_registry['spec_endpoint_path'] +
-                '/_/resource_list.json'
-            )
-        return req_registry
 
 
 def operation(**kwargs):
@@ -399,48 +324,61 @@ def nested(klass=None, **kwargs):
 
 
 def add_model(model_class):
-    models = registry['models']
+    models = StorageSingleton().registry['models']
+
     name = model_class.__name__
     model = models[name] = {'id': name}
     model['description'], model['notes'] = _parse_doc(model_class)
+
     if 'resource_fields' in dir(model_class):
-        # We take special care when the model class has a field resource_fields.
-        # By convension this field specifies what flask-restful would return when
-        # this model is used as a return value from an HTTP endpoint.
+        # We take special care when the model class
+        # has a field resource_fields.
+        # By convention this field specifies what flask-restful
+        # would return when this model is used as a return
+        # value from an HTTP endpoint.
         # We look at the class and search for an attribute named
         # resource_fields.
-        # If that attribute exists then we deduce the swagger model by the content
-        # of this attribute
+        # If that attribute exists then we deduce the swagger model
+        # by the content of this attribute
 
         if hasattr(model_class, 'required'):
-            required = model['required'] = model_class.required
+            model['required'] = model_class.required
 
         properties = model['properties'] = {}
-        nested = model_class.nested() if isinstance(model_class, _Nested) else {}
-        for field_name, field_type in list(model_class.resource_fields.items()):
-            nested_type = nested[field_name] if field_name in nested else None
-            properties[field_name] = deduce_swagger_type(field_type, nested_type)
+
+        is_nested = isinstance(model_class, _Nested)
+        nested = model_class.nested() if is_nested else {}
+
+        for name, _type in six.iteritems(model_class.resource_fields):
+            nested_type = nested[name] if name in nested else None
+            properties[name] = deduce_swagger_type(_type, nested_type)
+
     elif '__init__' in dir(model_class):
-        # Alternatively, if a resource_fields does not exist, we deduce the model
+        # Alternatively, if a resource_fields does not exist,
+        # we deduce the model
         # fields from the parameters sent to its __init__ method
 
         # Credits for this snippet go to Robin Walsh
         # https://github.com/hobbeswalsh/flask-sillywalk
         argspec = inspect.getargspec(model_class.__init__)
-        argspec.args.remove("self")
+        argspec.args.remove('self')
         defaults = {}
         required = model['required'] = []
+
         if argspec.defaults:
             defaults = list(
-                    zip(argspec.args[-len(argspec.defaults):], argspec.defaults))
+                zip(argspec.args[-len(argspec.defaults):], argspec.defaults)
+            )
+
         properties = model['properties'] = {}
         required_args_count = len(argspec.args) - len(defaults)
         for arg in argspec.args[:required_args_count]:
             required.append(arg)
-            # type: string for lack of better knowledge, until we add more metadata
+            # type: string for lack of better knowledge,
+            # until we add more metadata
             properties[arg] = {'type': 'string'}
         for k, v in defaults:
-            properties[k] = {'type': 'string', "default": v}
+            properties[k] = {'type': 'string', 'default': v}
 
     if 'swagger_metadata' in dir(model_class):
         for field_name, field_metadata in model_class.swagger_metadata.items():
@@ -454,12 +392,7 @@ def add_model(model_class):
 
 
 def deduce_swagger_type(python_type_or_object, nested_type=None):
-    import inspect
-
-    if inspect.isclass(python_type_or_object):
-        predicate = issubclass
-    else:
-        predicate = isinstance
+    # TODO: refactor this
     if predicate(python_type_or_object, (
             str,
             fields.String,
@@ -485,7 +418,7 @@ def deduce_swagger_type(python_type_or_object, nested_type=None):
                 'type': 'array',
                 'items': {
                     '$ref': deduce_swagger_type_flat(
-                        python_type_or_object.container, nested_type
+                            python_type_or_object.container, nested_type
                     )
                 }
             }
@@ -498,12 +431,7 @@ def deduce_swagger_type(python_type_or_object, nested_type=None):
 def deduce_swagger_type_flat(python_type_or_object, nested_type=None):
     if nested_type:
         return nested_type
-    import inspect
 
-    if inspect.isclass(python_type_or_object):
-        predicate = issubclass
-    else:
-        predicate = isinstance
     if predicate(python_type_or_object, (str,
                                          fields.String,
                                          fields.FormattedString,
