@@ -2,24 +2,28 @@
 
 from __future__ import absolute_import
 
-import six
-import os
-import mimetypes
 import importlib
+import os
+from collections import OrderedDict
 
 from flask import Blueprint
 from flask_restful import Api
 
+from flask_restful_swagger import swagger_definitions
 from flask_restful_swagger.producers import (
     JsonResourceListingProducer,
     JsonResourceProducer,
     HtmlProducer,
     BaseProducer,
 )
-from flask_restful_swagger import swagger_definitions
-
 
 __author__ = 'sobolevn'
+
+DEFAULTS_META_VALUES = {
+}
+DEFAULTS_LISTING_META_VALUES = {
+    'swaggerVersion': '1.2',
+}
 
 
 class SwaggerDocs(object):
@@ -45,18 +49,14 @@ class SwaggerDocs(object):
             self.definitions = importlib.import_module(
                 import_path
             )
-        except ImportError:
+        except ImportError as e:
             raise ValueError('No such swagger version: ' + version)
 
-    def _set_default_meta_values(self, values):
-        defaults_values = {
-            'apiVersion': '0.0.1',
-            'swaggerVersion': '1.2',
-        }
-
-        for k, v in six.iteritems(defaults_values):
-            if k not in values or not values[k]:
-                values[k] = v
+    @staticmethod
+    def _set_default_values(values, defaults_values):
+        results = defaults_values.copy()
+        results.update(values)
+        return results
 
     def __init__(self, api, swagger_meta=None, swagger_listing_meta=None,
                  api_spec_url='/api/spec', template_folder=None,
@@ -66,15 +66,21 @@ class SwaggerDocs(object):
                 "Provided `api` object is not flask-restful's Api")
 
         self.api = api
-        self.swagger_meta = swagger_meta
-        self.swagger_listing_meta = swagger_listing_meta
-        self._set_default_meta_values(self.swagger_listing_meta)
-        self._set_default_meta_values(self.swagger_meta)
+        self.swagger_meta = self._set_default_values(
+            swagger_meta, DEFAULTS_META_VALUES)
+        self.swagger_listing_meta = self._set_default_values(
+            swagger_listing_meta, DEFAULTS_LISTING_META_VALUES)
 
         self.definitions = None
         # This will set `self.definitions` to the appropriate module:
-        self._import_required_version(
-            swagger_listing_meta['swaggerVersion'])
+        swagger_version = self.swagger_listing_meta.pop('swagger', None)
+        if swagger_version:
+            self.swagger_listing_meta.pop('swaggerVersion', None)
+        else:
+            swagger_version = self.swagger_listing_meta.pop(
+                'swaggerVersion', None
+            )
+        self._import_required_version(swagger_version)
         self.swagger_meta = self.definitions.SwaggerMeta()
         self.swagger_listing_meta = self.definitions.SwaggerListingMeta(
             self.swagger_listing_meta
@@ -85,6 +91,7 @@ class SwaggerDocs(object):
         self.operations = []
         self.models = {}
         self.resources = {}
+        self.tags = OrderedDict()
 
         self.api_spec_url = api_spec_url
         self.static_url_path = static_url_path or ''
@@ -112,7 +119,7 @@ class SwaggerDocs(object):
 
     def init_app(self, app_or_api=None):
         try:
-            self.app = app_or_api.app  # we suppose, that this is Api
+            self.app = app_or_api.app  # we suppose that this is Api
         except AttributeError:
             self.app = app_or_api  # it was just app
             self.api.init_app(self.app)
@@ -126,30 +133,44 @@ class SwaggerDocs(object):
             static_url_path=self.static_url_path,
         )
 
-        # TODO: move url creation inside the producers!
         for producer_class in self.produces:
             producer_class(self).create_endpoint()
 
         self.app.register_blueprint(self.blueprint)
 
-    def add_resource(self, resource, url, **kwargs):
-        # TODO: multiple url support?
-        swagger_resource = self.definitions.SwaggerResource(resource, url=url)
+    def add_resource(self, resource, *urls, **kwargs):
+        swagger_resource = self.definitions.SwaggerResource(resource, *urls)
 
-        self.api.add_resource(resource, url, **kwargs)
+        self.api.add_resource(resource, *urls, **kwargs)
         self.resources.update({resource.endpoint: swagger_resource})
+        return swagger_resource
+
+    def add_tag(self, name, order, description, **kwargs):
+        self.tags.update({
+            order: self.definitions.SwaggerTag(name, order, description)
+        })
 
     def resource(self, **kwargs):
         def _inner(resource_class):
             resource_class.swagger_attr = kwargs
             return resource_class
+
         return _inner
 
     def operation(self, *args, **kwargs):
         def _inner(func):
-            operation = self.definitions.SwaggerOperation(
-                *args, **kwargs)
-            func.operation = operation
+            operation = self.definitions.SwaggerOperation(*args, **kwargs)
+            if 'resource' in kwargs.keys():
+                resource = kwargs['resource']
+                if not isinstance(resource, self.definitions.SwaggerResource):
+                    raise ValueError(
+                        "Provided `resource` object is not "
+                        "flask-restful-swagger's Resource"
+                    )
+                url = kwargs['url']
+                resource.operations[url].update({func.__name__: operation})
+            else:
+                func.swagger_operation = operation
             return func
         return _inner
 

@@ -15,7 +15,7 @@ app.config.from_object(config)
 
 api_listing_meta = {
     'apiVersion': '0.1',
-    'swaggerVersion': '1.2',
+    'swaggerVersion': '2.0',
     'info': {
         "title": "Swagger Sample App",
         "description": "This is a sample server Petstore server.",
