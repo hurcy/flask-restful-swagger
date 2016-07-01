@@ -156,9 +156,11 @@ class SwaggerDocs(object):
         self.api.add_resource(resource, url, **kwargs)
         self.resources.update({resource.endpoint: swagger_resource})
 
-    def resource(self, tags=None):
+    def resource(self, tags=None, **kwargs):
         def _inner(resource_class):
-            self.tags.append(self.definitions.SwaggerTag(tags))
+            resource_class.swagger_attr = kwargs
+            if tags:
+                self.tags.append(self.definitions.SwaggerTag(tags))
             return resource_class
         return _inner
 
@@ -170,15 +172,11 @@ class SwaggerDocs(object):
             return func
         return _inner
 
-    def model(self, obj):
-        def _inner(*args, **kwargs):
-            return obj(*args, **kwargs)
-
+    def model(self, obj=None):
         self.models.update({
             obj.__name__: self.definitions.SwaggerModel(obj)
         })
-        _inner.__name__ = obj.__name__
-        return _inner
+        return obj
 
     def _detect_producers(self, produces):
         if not produces:

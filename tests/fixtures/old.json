@@ -1,0 +1,150 @@
+{
+  "models": {
+	"TodoItemWithResourceFields": {
+	  "required": [
+		"a_string"
+	  ],
+	  "properties": {
+		"a_string": {
+		  "type": "string"
+		},
+		"a_fixed_point_decimal": {
+		  "type": "number"
+		},
+		"an_int": {
+		  "type": "integer"
+		},
+		"a_list_of_strings": {
+		  "items": {
+			"$ref": "string"
+		  },
+		  "type": "array"
+		},
+		"a_float": {
+		  "type": "number"
+		},
+		"a_formatted_string": {
+		  "type": "string"
+		},
+		"a_list_of_nested_types": {
+		  "items": {
+			"$ref": "ModelWithResourceFields"
+		  },
+		  "type": "array"
+		},
+		"an_float_with_arbitrary_precision": {
+		  "type": "number"
+		},
+		"a_url": {
+		  "type": "string"
+		},
+		"a_datetime": {
+		  "type": "date-time"
+		},
+		"a_nested_attribute": {
+		  "type": "ModelWithResourceFields"
+		},
+		"a_bool": {
+		  "type": "boolean"
+		}
+	  },
+	  "notes": "(http://flask-restful.readthedocs.org/en/latest/fields.html).<br/>Output Fields lets you add resource_fields to your model in which you specify<br/>the output of the model when it gets sent as an HTTP response.<br/>flask-restful-swagger takes advantage of this to specify the fields in<br/>the model",
+	  "id": "TodoItemWithResourceFields",
+	  "description": "This is an example of how Output Fields work"
+	},
+	"ModelWithResourceFields": {
+	  "properties": {
+		"a_string": {
+		  "type": "string"
+		}
+	  },
+	  "notes": null,
+	  "id": "ModelWithResourceFields",
+	  "description": null
+	},
+	"TodoItem": {
+	  "required": [
+		"arg1",
+		"arg2"
+	  ],
+	  "properties": {
+		"arg1": {
+		  "type": "string"
+		},
+		"arg2": {
+		  "type": "string"
+		},
+		"arg3": {
+		  "type": "string",
+		  "default": "123"
+		}
+	  },
+	  "notes": null,
+	  "id": "TodoItem",
+	  "description": null
+	}
+  },
+  "swaggerVersion": "1.2",
+  "description": "A Basic API",
+  "produces": [
+	"application/json",
+	"text/html"
+  ],
+  "apis": [
+	{
+	  "operations": [
+		{
+		  "method": "get",
+		  "notes": "get a todo item by ID",
+		  "nickname": "get",
+		  "parameters": [
+			{
+			  "name": "todo_id",
+			  "paramType": "path",
+			  "dataType": "string"
+			},
+			{
+			  "required": true,
+			  "allowMultiple": false,
+			  "name": "todo_id_x",
+			  "dataType": "string",
+			  "paramType": "path",
+			  "description": "The ID of the TODO item"
+			},
+			{
+			  "required": true,
+			  "allowMultiple": false,
+			  "name": "a_bool",
+			  "dataType": "boolean",
+			  "paramType": "path",
+			  "description": "The ID of the TODO item"
+			}
+		  ],
+		  "summary": "Summary"
+		}
+	  ],
+	  "notes": "Todo-Notes",
+	  "path": "/todo/{todo_id}",
+	  "description": "Todo-Description"
+	},
+	{
+	  "operations": [
+		{
+		  "notes": "get something",
+		  "responseClass": "TodoItemWithResourceFields",
+		  "summary": null,
+		  "method": "get",
+		  "nickname": "get",
+		  "parameters": []
+		}
+	  ],
+	  "notes": "extend from this class and expose methods for each supported HTTP<br/>method. If a resource is invoked with an unsupported HTTP method,<br/>the API will return a response with status 405 Method Not Allowed.<br/>Otherwise the appropriate method is called and passed all arguments<br/>from the url rule used when adding the resource to an Api instance. See<br/>:meth:`~flask_restful.Api.add_resource` for details.",
+	  "path": "/marshal",
+	  "description": "Represents an abstract RESTful resource. Concrete resources should"
+	}
+  ],
+  "basePath": "http://127.0.0.1:5000",
+  "spec_endpoint_path": "/api/spec",
+  "resourcePath": "/",
+  "apiVersion": "0.1"
+}
