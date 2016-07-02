@@ -38,12 +38,6 @@ DEFAULTS_LISTING_META_VALUES = {
 }
 
 class SwaggerDocs(object):
-    _known_producers = [
-        JsonResourceListingProducer,
-        JsonResourceProducer,
-        HtmlProducer,
-    ]
-
     def _import_required_version(self, version):
         """
         This method is used to dynamically import the required swagger
@@ -96,7 +90,6 @@ class SwaggerDocs(object):
             self.swagger_listing_meta
         )
 
-        self._detect_producers(self.swagger_meta)
 
         self.operations = []
         self.models = {}
@@ -143,11 +136,8 @@ class SwaggerDocs(object):
             template_folder=self.template_folder,
             static_url_path=self.static_url_path,
         )
-
-        # TODO: move url creation inside the producers!
-        for producer_class in self.produces:
-            producer_class(self).create_endpoint()
-
+        #this also includes creation of endpoints for producers
+        self.produces = BaseProducer.detect_producers(self.swagger_meta, self)
         self.app.register_blueprint(self.blueprint)
 
     def add_resource(self, resource, url, **kwargs):
@@ -193,19 +183,4 @@ class SwaggerDocs(object):
         return ret
 
 
-    def _detect_producers(self, produces):
-        if not produces:
-            self.produces = self.__class__._known_producers
-        else:
-            self.produces = []
-            for wanted_producer in produces:
-                if wanted_producer in self.produces:
-                    continue
 
-                if issubclass(wanted_producer, BaseProducer):
-                    self.produces.append(wanted_producer)
-                    continue
-
-                for producer in self.__class__._known_producers:
-                    if producer.content_type == wanted_producer:
-                        self.produces.append(producer)

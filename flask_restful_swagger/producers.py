@@ -11,6 +11,30 @@ class BaseProducer(object):
     content_type = None
     swagger = None
 
+    @classmethod
+    def detect_producers(cls, produces, swagger):
+        _known_producers = cls.__subclasses__()
+        if not produces:
+            producers = _known_producers
+        else:
+            producers = []
+            for wanted_producer in produces:
+                if wanted_producer in producers:
+                    continue
+
+                if issubclass(wanted_producer, BaseProducer):
+                    producers.append(wanted_producer)
+                    continue
+
+                for producer in _known_producers:
+                    if producer.content_type == wanted_producer:
+                        producers.append(producer)
+
+        for producer_class in producers:
+            producer_class(swagger).create_endpoint()
+
+        return producers
+
     def __init__(self, swagger):
         self.swagger = swagger
 
