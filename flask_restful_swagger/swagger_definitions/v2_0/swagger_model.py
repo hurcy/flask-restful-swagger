@@ -62,7 +62,7 @@ class SwaggerModel(SwaggerDefinition):
             ('integer', cls.INTEGER),
             ('number', cls.NUMBER),
             ('boolean', cls.BOOLEAN),
-            ('date-time', cls.DATETIME),
+            ('date-time', cls.DATETIME), #TODO: this type is not supported by swagger JSON schema!
         ]
 
         predicate = cls.predicate(obj)
@@ -83,11 +83,6 @@ class SwaggerModel(SwaggerDefinition):
     def _parse_resource_fields(self):
         resource_fields = self.model_class.resource_fields
 
-        try:  # trying to parse `required` field at first:
-            required = set(self.model_class.required)
-        except AttributeError:
-            required = []  # there's no required field provided.
-
         is_nested = isinstance(self.model_class, SwaggerNestedModel)
         nested = self.model_class.nested() if is_nested else {}
 
@@ -95,8 +90,6 @@ class SwaggerModel(SwaggerDefinition):
         for name, field in resource_fields.items():
             nested_type = nested[name] if name in nested else None
             values = self.deduce_swagger_type(field, nested_type)
-            if name in required:
-                values.update({'required': True})
             properties[name] = values
 
         return properties
@@ -118,7 +111,7 @@ class SwaggerModel(SwaggerDefinition):
 
     def _construct_swagger_model(self):
         result = {
-            'id': self.model_class.__name__,
+            'type': 'object',
         }
 
         try:
@@ -150,6 +143,12 @@ class SwaggerModel(SwaggerDefinition):
             pass
 
         result['properties'] = properties
+
+        try:  # trying to parse `required` field at first:
+            required = self.model_class.required
+            result['required'] = required
+        except AttributeError:
+            required = []  # there's no required field provided.
 
         return result
 

@@ -27,7 +27,7 @@ DEFAULTS_META_VALUES = {
  }
 
 DEFAULTS_LISTING_META_VALUES = {
-    'swaggerVersion': '2.0',
+#    'swagger': '2.0',
     'info': {
         "license": {
             "name": "Apache 2.0",

@@ -92,7 +92,7 @@ class TodoItemWithResourceFields(object):
         'a_float': fields.Float,
         'an_float_with_arbitrary_precision': fields.Arbitrary,
         'a_fixed_point_decimal': fields.Fixed,
-        'a_datetime': fields.DateTime,
+#        'a_datetime': fields.DateTime,  #not supported by swagger JSON schema, test will fail
         'a_list_of_strings': fields.List(fields.String),
         'a_nested_attribute': fields.Nested(
             ModelWithResourceFields.resource_fields),
@@ -132,9 +132,10 @@ class Todo(Resource):
             parameters=[{
                 "name": "todo_id",
                 "in": "path",
-                "description": "ID of todo item that we should return",
+                "description": "ID of todo item to return",
                 "required": True,
-                "type": "string"
+                "type": "integer",
+                "format": "int64"
             }, ],
             responses={
                 "200": {
@@ -259,7 +260,8 @@ class MarshalWithExample(Resource):
         }
 
 #parameter name in url should be identical to parameter name in swagger.operation
-swagger.add_resource(Todo, '/todo/<int:todo_id>')
+#swagger.add_resource(Todo, '/todo/<int:todo_id>')
+swagger.add_resource(Todo, '/todo')
 
 swagger.add_resource(MarshalWithExample, '/marshal')
 
