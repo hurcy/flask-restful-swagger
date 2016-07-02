@@ -34,26 +34,29 @@ class SwaggerModel(SwaggerDefinition):
         if predicate(obj, cls.all_types()):
             return {'type': cls.deduce_swagger_type_flat(obj)}
 
-        # TODO:
-        # if predicate(obj, (fields.List, )):
-        #     if inspect.isclass(obj):
-        #         return {'type': 'array'}
-        #     else:
-        #         return {
-        #             'type': 'array',
-        #             'items': {
-        #                 '$ref': cls.deduce_swagger_type_flat(
-        #                         obj.container, nested_type)
-        #             }
-        #         }
-        #
-        # if predicate(obj, (fields.Nested, )):
-        #     return {'type': nested_type}
+        if predicate(obj, (fields.List, )):
+             if inspect.isclass(obj):
+                 return {'type': 'array'}
+             else:
+                 return {
+                     'type': 'array',
+                     'items': {
+                         '$ref': "#/definitions/" + cls.deduce_swagger_type_flat(
+                                 obj.container, nested_type)
+                     }
+                 }
+
+        if predicate(obj, (fields.Nested, )):
+            return {'$ref': "#/definitions/" + cls.deduce_swagger_type_flat(
+                                 obj, nested_type)}
 
         return {'type': 'null'}
 
     @classmethod
     def deduce_swagger_type_flat(cls, obj, nested_type=None):
+        if nested_type:
+            return nested_type
+
         mapping = [
             ('string', cls.STRING),
             ('integer', cls.INTEGER),
@@ -85,9 +88,13 @@ class SwaggerModel(SwaggerDefinition):
         except AttributeError:
             required = []  # there's no required field provided.
 
+        is_nested = isinstance(self.model_class, SwaggerNestedModel)
+        nested = self.model_class.nested() if is_nested else {}
+
         properties = {}
         for name, field in resource_fields.items():
-            values = self.deduce_swagger_type(field)
+            nested_type = nested[name] if name in nested else None
+            values = self.deduce_swagger_type(field, nested_type)
             if name in required:
                 values.update({'required': True})
             properties[name] = values
@@ -122,7 +129,7 @@ class SwaggerModel(SwaggerDefinition):
             properties = self._parse_constructor()
         except Exception:
             # This model is not valid, `resource_fields` nor `init` provided.
-            raise AttributeError('{} model is a valid swagger model.'.format(
+            raise AttributeError('{} model is not a valid swagger model.'.format(
                 self.model_class.__name__
             ))
 
@@ -148,3 +155,18 @@ class SwaggerModel(SwaggerDefinition):
 
     def render(self):
         return self.swagger_model
+
+
+class SwaggerNestedModel(object):
+    def __init__(self, klass, **kwargs):
+        self._nested = kwargs
+        self._klass = klass
+
+    def __call__(self, *args, **kwargs):
+        return self._klass(*args, **kwargs)
+
+    def nested(self):
+        return self._nested
+
+
+

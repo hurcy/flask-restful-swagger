@@ -35,6 +35,8 @@ class BaseProducer(object):
 
 
 class HtmlProducer(BaseProducer):
+    """This is wrapper for html representation. It just calls index.html from standard swagger library
+    passing JSON swagger spec as a url parameter"""
     content_type = 'text/html'
 
     def get(self, *args, **kwargs):
@@ -49,6 +51,7 @@ class HtmlProducer(BaseProducer):
 
 
 class JsonResourceListingProducer(BaseProducer):
+    """Base JSON generator. It generates full swagger specification for whole application"""
     content_type = 'application/json'
 
     def get(self, *args, **kwargs):
@@ -58,6 +61,8 @@ class JsonResourceListingProducer(BaseProducer):
 
 
 class JsonResourceProducer(BaseProducer):
+    """JSON generator for particular resource,
+    name of resource should be passed in url like this /json/<string:resource>"""
     content_type = 'application/json'
 
     def create_endpoint(self):

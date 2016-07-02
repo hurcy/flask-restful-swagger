@@ -72,6 +72,10 @@ class ModelWithResourceFields(object):
 
 
 @swagger.model
+@swagger.nested(
+    a_nested_attribute=ModelWithResourceFields.__name__,
+    a_list_of_nested_types=ModelWithResourceFields.__name__,
+)
 class TodoItemWithResourceFields(object):
     """This is an example of how Output Fields work
     (http://flask-restful.readthedocs.org/en/latest/fields.html).
@@ -90,6 +94,10 @@ class TodoItemWithResourceFields(object):
         'a_fixed_point_decimal': fields.Fixed,
         'a_datetime': fields.DateTime,
         'a_list_of_strings': fields.List(fields.String),
+        'a_nested_attribute': fields.Nested(
+            ModelWithResourceFields.resource_fields),
+        'a_list_of_nested_types': fields.List(
+            fields.Nested(ModelWithResourceFields.resource_fields)),
     }
 
     # Specify which of the resource fields are required
@@ -112,12 +120,14 @@ class Todo(Resource):
     """
     Todo-Description
     Todo-Notes
+    In get operation inline model of response is used. If you gonna use common model in several operations
+    it's better to describe it as swagger.model and put references in each response
+    as shown in marshal_with example
     """
 
     @swagger.operation(
             tags= ["todo"],
             summary='get a todo item by ID',
-#            type=ModelWithResourceFields.__name__,
             operationId='getTodoItem',
             parameters=[{
                 "name": "todo_id",
@@ -219,10 +229,18 @@ marshal_tags = [
 @swagger.resource(tags=marshal_tags)
 class MarshalWithExample(Resource):
     @swagger.operation(
-        notes=u'get something',
-#        responseClass=u'ModelWithResourceFields',
-        nickname=u'get',
         tags=["marshal"],
+        summary='marshalling with example',
+        operationId='marshal_with',
+        parameters=[{
+			"in": "body",
+			"name": "body",
+			"description": "simple model that is used as a parameter structure",
+			"required": True,
+			"schema": {
+			  "$ref": "#/definitions/TodoItem"
+			}
+		  }, ],
         responses={
             "200": {
                 "description": "successful operation",

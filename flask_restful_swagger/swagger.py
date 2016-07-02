@@ -6,6 +6,7 @@ import six
 import os
 import mimetypes
 import importlib
+import functools
 
 
 from flask import Blueprint
@@ -177,6 +178,20 @@ class SwaggerDocs(object):
             obj.__name__: self.definitions.SwaggerModel(obj)
         })
         return obj
+
+    def nested(self, klass=None, **kwargs):
+        if klass:
+            ret = self.definitions.SwaggerNestedModel(klass)
+            functools.update_wrapper(ret, klass)
+        else:
+            def wrapper(klass):
+                wrapped = self.definitions.SwaggerNestedModel(klass, **kwargs)
+                functools.update_wrapper(wrapped, klass)
+                return wrapped
+
+            ret = wrapper
+        return ret
+
 
     def _detect_producers(self, produces):
         if not produces:
