@@ -15,7 +15,6 @@ class SwaggerRegistry(Resource):
         if request.path.endswith('.html'):
             return render_homepage(
                 req_registry['basePath'] +
-                req_registry['spec_endpoint_path'] +
                 '/_/resource_list.json'
             )
         return req_registry

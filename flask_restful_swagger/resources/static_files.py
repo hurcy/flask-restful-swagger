@@ -28,12 +28,17 @@ class StaticFiles(Resource):
 
         if file_path in [  # TODO: refactor to TemplateResource
             "index.html",
-            "o2c.html",
-            "swagger-ui.js",
-            "swagger-ui.min.js",
-            "lib/swagger-oauth.js",
+            # "swagger-ui-bundle.js",
+            # "swagger-ui-standalone-preset.js",
+            # "swagger-initializer.js",
+            # "index.css"
+            ## "o2c.html",
+            ## "swagger-ui.js",
+            ## "swagger-ui.min.js",
+            ## "lib/swagger-oauth.js",
         ]:
-            conf = {'resource_list_url': req_registry['spec_endpoint_path']}
+            print("!!?@?@?")
+            conf = {'resource_list_url': req_registry['basePath']}
             return render_page(file_path, conf)
 
         mime = mimetypes.guess_type(file_path)[0]

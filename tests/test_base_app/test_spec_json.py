@@ -36,7 +36,7 @@ class TestSpecJson(BaseIntegrationTest):
             return json.load(f)
 
     def test_full_equality(self):
-        fixture = self._load_json_fixture('spec.json')
+        fixture = self._load_json_fixture('test.json')
         real = self._load_spec_json()
         assert fixture == real
 
@@ -44,16 +44,16 @@ class TestSpecJson(BaseIntegrationTest):
         result = self._load_spec_json()
 
         keys_to_be_equal = [
-            'description',
-            'apiVersion',
-            'produces',
-            'resourcePath',
+            'info',
+            'swagger',
+            'host',
+            # 'basePath',
         ]
         for key in keys_to_be_equal:
             assert api_meta[key] == result[key]
 
         key_mapping = [
-            ('api_spec_url', 'spec_endpoint_path'),
+            ('base_path', 'basePath'),
         ]
         for meta_key, json_key in key_mapping:
             assert api_meta[meta_key] == result[json_key]

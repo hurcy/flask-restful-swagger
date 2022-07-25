@@ -22,7 +22,7 @@ def get_current_registry(api=None):
         app_name = request.blueprint
         urlparts = urlparse.urlparse(request.url_root.rstrip('/'))
         proto = request.headers.get("x-forwarded-proto") or urlparts[0]
-        overrides = {'basePath': urlparse.urlunparse([proto] + list(urlparts[1:]))}
+        # overrides = {'basePath': urlparse.urlunparse([proto] + list(urlparts[1:]))}
 
     if not app_name:
         app_name = 'app'
@@ -32,6 +32,6 @@ def get_current_registry(api=None):
     reg = registry.setdefault(app_name, {})
     reg.update(overrides)
 
-    reg['basePath'] = reg['basePath'] + (reg.get('x-api-prefix', '') or '')
+    # reg['basePath'] = reg['basePath'] # + (reg.get('x-api-prefix', '') or '')
 
     return reg

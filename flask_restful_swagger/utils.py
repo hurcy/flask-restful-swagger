@@ -65,8 +65,8 @@ def render_page(page, info):
     templates = st.templates
 
     conf = {
-        'base_url': url + st.api_spec_static,
-        'full_base_url': url + st.api_spec_static
+        'base_url': url + st.base_path,
+        'full_base_url': url + st.base_path
     }
     if info is not None:
         conf.update(info)

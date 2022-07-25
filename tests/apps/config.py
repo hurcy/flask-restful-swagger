@@ -4,7 +4,7 @@ __author__ = 'sobolevn'
 
 SECRET_KEY = 'testtest'
 
-SERVER_NAME = '127.0.0.1:5000'
+SERVER_NAME = '0.0.0.0:5001'
 
-DEBUG = False  # there's a know bug, when testing with DEBUG=True
+DEBUG = True  # there's a know bug, when testing with DEBUG=True
 TESTING = True

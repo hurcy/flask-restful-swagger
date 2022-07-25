@@ -17,7 +17,7 @@ class StorageSingleton(object):
         if cls.__obj is None:
             cls.__obj = object.__new__(cls)
 
-            cls.api_spec_static = ''
+            cls.base_path = ''
             cls.resource_listing_endpoint = None
 
             cls.registry = {

@@ -22,11 +22,7 @@ setup(
     ],
     package_data={
         'flask_restful_swagger': [
-            'static/*.*',
-            'static/css/*.*',
-            'static/images/*.*',
-            'static/lib/*.*',
-            'static/lib/shred/*.*',
+            'static/*.*'
         ]
     },
     description='Extract swagger specs from your flask-restful project',

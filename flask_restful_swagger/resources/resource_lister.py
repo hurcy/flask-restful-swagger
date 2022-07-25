@@ -10,13 +10,12 @@ __author__ = 'sobolevn'
 class ResourceLister(Resource):
     def get(self):
         req_registry = get_current_registry()
-        path = req_registry['basePath'] + req_registry['spec_endpoint_path']
+        path = req_registry['basePath']
 
         return {
-            "apiVersion": req_registry['apiVersion'],
-            "swaggerVersion": req_registry['swaggerVersion'],
+            "info": req_registry['info'],
+            "swagger": req_registry['swagger'],
             "apis": [{
-                "path": path,
-                "description": req_registry['description']
+                "path": path
             }]
         }

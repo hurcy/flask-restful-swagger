@@ -34,54 +34,48 @@ from flask_restful_swagger.utils import (
 
 # TODO: add pydoc.
 def _docs(api,
-          api_version='0.0',
-          swagger_version='1.2',
-          base_path='http://localhost:5000',
-          resource_path='/',
-          produces="application/json",
-          api_spec_url='/api/spec',
-          description='Auto generated API docs by flask-restful-swagger'):
-    """
+          swagger='2.0',
+          host='http://localhost:5000',
+        #   resource_path='/',
+        #   produces="application/json",
+          base_path='/api/spec',
+          info=dict(
+              version='0.0',
+            description='Auto generated API docs by flask-restful-swagger')):
 
-    :param api:
-    :param api_version:
-    :param swagger_version:
-    :param base_path:
-    :param resource_path:
-    :param produces:
-    :param api_spec_url:
-    :param description:
-    :return:
-    """
-    api_add_resource = api.add_resource
-
-    def add_resource(resource, *urls, **kwargs):
-        register_once(
-            api, api_add_resource, api_version,
-            swagger_version, base_path, resource_path,
-            produces, api_spec_url, description,
+    # api_add_resource = api.add_resource
+    register_once(
+            api, api.add_resource, 
+            info, swagger, host, base_path
         )
+    
+    # def add_resource(resource, *urls, **kwargs):
+    #     register_once(
+    #         api, api_add_resource, api_version,
+    #         swagger, host, resource_path,
+    #         produces, base_path, description,
+    #     )
 
-        resource = return_class(resource)
-        # Changed in #pull/92
-        for path in urls:
-            endpoint = swagger_endpoint(api, resource, path)
+    #     resource = return_class(resource)
+    #     # Changed in #pull/92
+    #     for path in urls:
+    #         endpoint = swagger_endpoint(api, resource, path)
 
-            # Add '.help.json' and '.help.html' help urls:
-            swagger_path = extract_swagger_path(path)
-            endpoint_html_str = '{0}/help'.format(swagger_path)
-            # TODO: help.html probably should have a separate endpoint
-            # with a unique name, to be accessible within the code.
-            api_add_resource(
-                endpoint,
-                "{0}.help.json".format(swagger_path),
-                "{0}.help.html".format(swagger_path),
-                endpoint=endpoint_html_str,
-            )
+    #         # Add '.help.json' and '.help.html' help urls:
+    #         swagger_path = extract_swagger_path(path)
+    #         endpoint_html_str = '{0}/help'.format(swagger_path)
+    #         # TODO: help.html probably should have a separate endpoint
+    #         # with a unique name, to be accessible within the code.
+    #         api_add_resource(
+    #             endpoint,
+    #             "{0}.help.json".format(swagger_path),
+    #             "{0}.help.html".format(swagger_path),
+    #             endpoint=endpoint_html_str,
+    #         )
 
-        return api_add_resource(resource, *urls, **kwargs)
+    #     return api_add_resource(resource, *urls, **kwargs)
 
-    api.add_resource = add_resource
+    # api.add_resource = add_resource
     return api
 
 
@@ -106,14 +100,9 @@ def docs(api, **kwargs):
 
 
 def register_once(api,
-                  add_resource_func,
-                  api_version,
-                  swagger_version,
-                  base_path,
-                  resource_path,
-                  produces,
-                  endpoint_path,
-                  description):
+                  add_resource_func,                  
+                  info, swagger, host, base_path
+                 ):
     def registering_blueprint(setup_state):
         reg = registry[setup_state.blueprint.name]
         reg['x-api-prefix'] = setup_state.url_prefix
@@ -122,17 +111,13 @@ def register_once(api,
         resource_listing_endpoint = StorageSingleton().resource_listing_endpoint
 
         registry[name] = {
-            'apiVersion': api_version,
-            'swaggerVersion': swagger_version,
-            'basePath': base_path,
-            'spec_endpoint_path': endpoint_path,
-            'resourcePath': resource_path,
-            'produces': produces,
-            'description': description,
+            'info': info,
+            'swagger': swagger,
+            'host': host,
+            'basePath': base_path
         }
         if is_blueprint:
             registry[name].update({
-                'x-api-prefix': '',
                 'apis': [],
             })
 
@@ -140,25 +125,25 @@ def register_once(api,
 
         add_resource_func(
             SwaggerRegistry,
-            endpoint_path,
-            endpoint_path + '.json',
-            endpoint_path + '.html',
+            base_path,
+            base_path + '.json',
+            base_path + '.html',
             endpoint='app/registry' if not is_blueprint else None,
         )
 
-        resource_listing_endpoint = endpoint_path + '/_/resource_list.json'
+        resource_listing_endpoint = base_path + '/_/resource_list.json'
         add_resource_func(
             ResourceLister, resource_listing_endpoint,
             endpoint='app/resourcelister' if not is_blueprint else None,
         )
 
         st = StorageSingleton()
-        st.api_spec_static = endpoint_path + '/_/static/'
+        st.base_path = base_path + '/_/static/'
         add_resource_func(  # TODO: why static path is like this?
             StaticFiles,
-            st.api_spec_static + '<string:dir1>/<string:dir2>/<string:dir3>',
-            st.api_spec_static + '<string:dir1>/<string:dir2>',
-            st.api_spec_static + '<string:dir1>',
+            st.base_path + '<string:dir1>/<string:dir2>/<string:dir3>',
+            st.base_path + '<string:dir1>/<string:dir2>',
+            st.base_path + '<string:dir1>',
             endpoint='app/staticfiles' if not is_blueprint else None,
         )
 
