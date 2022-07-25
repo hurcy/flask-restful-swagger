@@ -13,9 +13,9 @@ __author__ = 'sobolevn'
 api_meta = {
     "swagger": "2.0",
 	"info": {
-		"description": "This is a sample server Petstore server.  You can find out more about Swagger at [http://swagger.io](http://swagger.io) or on [irc.freenode.net, #swagger](http://swagger.io/irc/).  For this sample, you can use the api key `special-key` to test the authorization filters.",
-		"version": "1.0.6",
-		"title": "Swagger Petstore",
+		"description": "This is a sample server",
+		"version": "1.0.0",
+		"title": "Swagger Test",
 	},
 	"host": "http://0.0.0.0:5001",
 	"base_path": "/api/spec",
@@ -27,6 +27,14 @@ app.config.from_object(config)
 api = swagger.docs(Api(app), **api_meta)
 api.add_resource(Todo, '/todo/<string:todo_id>')
 api.add_resource(MarshalWithExample, '/marshal')
+
+api.init_app(app)
+
+
+from pprint import pprint
+pprint(list(app.url_map.iter_rules()))
+for route in app.url_map.iter_rules():
+    print(route)
 
 if __name__ == '__main__':
     app.run()

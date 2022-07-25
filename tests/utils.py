@@ -57,6 +57,7 @@ class BaseIntegrationTest(unittest.TestCase):
     def get_raw_link(self, link, *args, **kwargs):
         with self.__class__.app.app_context():
             with self.__class__.app.test_client() as c:
+                print(link)
                 return c.get(link, *args, **kwargs)
 
     # assertions:

@@ -13,6 +13,8 @@ class SwaggerRegistry(Resource):
     def get(self):
         req_registry = get_current_registry()
         if request.path.endswith('.html'):
+            print(req_registry['basePath'] +
+                '/_/resource_list.json')
             return render_homepage(
                 req_registry['basePath'] +
                 '/_/resource_list.json'

@@ -32,50 +32,49 @@ from flask_restful_swagger.utils import (
 )
 
 
-# TODO: add pydoc.
 def _docs(api,
           swagger='2.0',
           host='http://localhost:5000',
-        #   resource_path='/',
-        #   produces="application/json",
           base_path='/api/spec',
           info=dict(
-              version='0.0',
+            title="Test",
+            version='0.0',
             description='Auto generated API docs by flask-restful-swagger')):
 
-    # api_add_resource = api.add_resource
-    register_once(
+    api_add_resource = api.add_resource
+    
+    
+    def add_resource(resource, *urls, **kwargs):
+        register_once(
             api, api.add_resource, 
             info, swagger, host, base_path
         )
-    
-    # def add_resource(resource, *urls, **kwargs):
-    #     register_once(
-    #         api, api_add_resource, api_version,
-    #         swagger, host, resource_path,
-    #         produces, base_path, description,
-    #     )
+        
+        resource = return_class(resource)
+        
+        print(resource)
+        # Changed in #pull/92
+        print(*urls)
+        for path in urls:
+            endpoint = swagger_endpoint(api, resource, path)
+            print(endpoint)
+            # Add '.help.json' and '.help.html' help urls:
+            swagger_path = extract_swagger_path(path)
+            endpoint_html_str = '{0}/help'.format(swagger_path)
+            # TODO: help.html probably should have a separate endpoint
+            # with a unique name, to be accessible within the code.
+            api_add_resource(
+                endpoint,
+                swagger_path,
+                swagger_path,
+                # "{0}.help.json".format(swagger_path),
+                # "{0}.help.html".format(swagger_path),
+                endpoint=swagger_path,
+            )
 
-    #     resource = return_class(resource)
-    #     # Changed in #pull/92
-    #     for path in urls:
-    #         endpoint = swagger_endpoint(api, resource, path)
+        return api_add_resource(resource, *urls, **kwargs)
 
-    #         # Add '.help.json' and '.help.html' help urls:
-    #         swagger_path = extract_swagger_path(path)
-    #         endpoint_html_str = '{0}/help'.format(swagger_path)
-    #         # TODO: help.html probably should have a separate endpoint
-    #         # with a unique name, to be accessible within the code.
-    #         api_add_resource(
-    #             endpoint,
-    #             "{0}.help.json".format(swagger_path),
-    #             "{0}.help.html".format(swagger_path),
-    #             endpoint=endpoint_html_str,
-    #         )
-
-    #     return api_add_resource(resource, *urls, **kwargs)
-
-    # api.add_resource = add_resource
+    api.add_resource = add_resource
     return api
 
 
@@ -100,8 +99,7 @@ def docs(api, **kwargs):
 
 
 def register_once(api,
-                  add_resource_func,                  
-                  info, swagger, host, base_path
+                  add_resource_func, info, swagger, host, base_path
                  ):
     def registering_blueprint(setup_state):
         reg = registry[setup_state.blueprint.name]
@@ -141,8 +139,6 @@ def register_once(api,
         st.base_path = base_path + '/_/static/'
         add_resource_func(  # TODO: why static path is like this?
             StaticFiles,
-            st.base_path + '<string:dir1>/<string:dir2>/<string:dir3>',
-            st.base_path + '<string:dir1>/<string:dir2>',
             st.base_path + '<string:dir1>',
             endpoint='app/staticfiles' if not is_blueprint else None,
         )
