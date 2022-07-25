@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from flask import Flask
-from flask.ext.restful import Api
+from flask_restful import Api
 from flask_restful_swagger import swagger
 
 from tests.apps import config

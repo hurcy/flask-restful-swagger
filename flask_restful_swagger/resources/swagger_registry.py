@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from flask import request
-from flask.ext.restful import Resource
+from flask_restful import Resource
 
 from flask_restful_swagger.registry import get_current_registry
 from flask_restful_swagger.utils import render_homepage

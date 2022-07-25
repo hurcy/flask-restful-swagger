@@ -3,7 +3,7 @@
 import six
 
 from flask import request
-from flask.ext.restful import Resource
+from flask_restful import Resource
 
 from flask_restful_swagger.utils import render_endpoint
 

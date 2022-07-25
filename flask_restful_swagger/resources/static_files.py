@@ -4,7 +4,7 @@ import os
 import mimetypes
 
 from flask import abort, send_file
-from flask.ext.restful import Resource
+from flask_restful import Resource
 from flask_restful_swagger import root_path
 
 from flask_restful_swagger.registry import get_current_registry

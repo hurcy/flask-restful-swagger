@@ -13,7 +13,7 @@ try:
 except ImportError:
     from urllib import parse as urlparse
 
-from flask.ext.restful import fields
+from flask_restful import fields
 from flask_restful_swagger import StorageSingleton
 
 from flask_restful_swagger.registry import get_current_registry
